@@ -1,7 +1,11 @@
 package com.neuronrobotics.bowlerstudio.creature;
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
+
 import javafx.fxml.FXML;
 import javafx.scene.control.TreeView;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 public class CreatureLabControlsTab {
@@ -22,17 +26,17 @@ public class CreatureLabControlsTab {
 		return walkingBox;
 	}
 
-	public void setWalkingBox(AnchorPane walkingBox) {
-		this.walkingBox = walkingBox;
-	}
+//	public void setWalkingBox(AnchorPane walkingBox) {
+//		this.walkingBox = walkingBox;
+//	}
 
 	public AnchorPane getControlsBox() {
-		return controlsBox;
+		return walkingBox;
 	}
 
-	public void setControlsBox(AnchorPane controlsBox) {
-		this.controlsBox = controlsBox;
-	}
+//	public void setControlsBox(AnchorPane controlsBox) {
+//		this.controlsBox = controlsBox;
+//	}
 
 //	public AnchorPane getProgressBar() {
 //		return progressBar;
@@ -51,24 +55,29 @@ public class CreatureLabControlsTab {
 	}
 
 
-	public void setOverlayTop(VBox progress) {
+	public void setOverlayTop(GridPane radioOptions) {
 		// TODO Auto-generated method stub
-		progressBar.getChildren().clear();
-		progressBar.getChildren().add(progress);
-		AnchorPane.setTopAnchor(progress, 0.0);
-		AnchorPane.setLeftAnchor(progress, 0.0);
-     	AnchorPane.setRightAnchor(progress, 0.0);
-     	AnchorPane.setBottomAnchor(progress, 0.0);
+		BowlerStudio.runLater(()->{
+			progressBar.getChildren().clear();
+			progressBar.getChildren().add(radioOptions);
+			AnchorPane.setTopAnchor(radioOptions, 0.0);
+			AnchorPane.setLeftAnchor(radioOptions, 0.0);
+	     	AnchorPane.setRightAnchor(radioOptions, 0.0);
+	     	AnchorPane.setBottomAnchor(radioOptions, 0.0);
+		});
 	}
 
 	public void setOverlayTopRight(JogMobileBase walkWidget) {
 		// TODO Auto-generated method stub
-		walkingBox.getChildren().clear();
-		walkingBox.getChildren().add(walkWidget);
-		AnchorPane.setTopAnchor(walkWidget, 0.0);
-		AnchorPane.setLeftAnchor(walkWidget, 0.0);
-     	AnchorPane.setRightAnchor(walkWidget, 0.0);
-     	AnchorPane.setBottomAnchor(walkWidget, 0.0);
+		// @JansenSmith - placed contents in llambda runnable - 20220915
+		BowlerStudio.runLater(()->{
+			walkingBox.getChildren().clear();
+			walkingBox.getChildren().add(walkWidget);
+			AnchorPane.setTopAnchor(walkWidget, 0.0);
+			AnchorPane.setLeftAnchor(walkWidget, 0.0);
+	     	AnchorPane.setRightAnchor(walkWidget, 0.0);
+	     	AnchorPane.setBottomAnchor(walkWidget, 0.0);
+		});
 	}
 
     

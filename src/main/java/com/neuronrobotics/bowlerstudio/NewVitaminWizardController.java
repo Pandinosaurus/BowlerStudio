@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
@@ -17,6 +18,7 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import com.neuronrobotics.bowlerstudio.assets.AssetFactory;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 import com.neuronrobotics.bowlerstudio.scripting.PasswordManager;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 import com.neuronrobotics.bowlerstudio.vitamins.Vitamins;
@@ -27,6 +29,7 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -135,7 +138,7 @@ public class NewVitaminWizardController  extends Application {
 					Vitamins.setScript(typeOfVitaminString, gitURL, filename);
 					
 					String measurments ="";
-					for(String key:Vitamins.getConfiguration( typeOfVitaminString,sizeOfVitaminString).keySet().stream().sorted().collect(Collectors.toList())) {
+					for(String key:Vitamins.getConfigurationRW( typeOfVitaminString,sizeOfVitaminString).keySet().stream().sorted().collect(Collectors.toList())) {
 						measurments+="\n	def "+key+"Value = measurments."+key;
 					}
 					measurments+="\n\tfor(String key:measurments.keySet().stream().sorted().collect(Collectors.toList())){";
@@ -170,7 +173,10 @@ public class NewVitaminWizardController  extends Application {
 							loader, "new CAD loader script");
 					new Thread(() -> BowlerStudio.createFileTab(Vitamins.getScriptFile(typeOfVitaminString))).start();
 				}
-				
+				if(isShaft.isSelected())
+					Vitamins.setIsShaft(typeOfVitaminString);
+				if(isMotor.isSelected())
+					Vitamins.setIsActuator(typeOfVitaminString);
 				Vitamins.saveDatabaseForkIfMissing(typeOfVitaminString);
 				
 				if(newTypeRadio.isSelected()) {
@@ -183,7 +189,7 @@ public class NewVitaminWizardController  extends Application {
 				new IssueReportingExceptionHandler().uncaughtException(Thread.currentThread(), e1);
 			}
 			try {
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					this.primaryStage.close();
 					primaryStage=null;
 				});
@@ -193,7 +199,7 @@ public class NewVitaminWizardController  extends Application {
 				new IssueReportingExceptionHandler().uncaughtException(Thread.currentThread(), e);
 				
 			}
-			
+			Vitamins.clear();
 		}).start();
 
     }
@@ -203,24 +209,36 @@ public class NewVitaminWizardController  extends Application {
     	if(!editExisting.isSelected()) {
 	    	sizeOfVitaminString = newSizeField.getText();
 	    	if(sizeOfVitaminString.length()<2) {
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					Alert alert = new Alert(AlertType.WARNING);
 					alert.setTitle("No name specified!");
 					alert.setHeaderText("Names must be at least 2 charrectors long");
 					alert.setContentText("Try again...");
+					Node root = alert.getDialogPane();
+					Stage stage = (Stage) alert.getDialogPane().getScene().getWindow();
+					stage.setOnCloseRequest(ev -> alert.hide());
+					FontSizeManager.addListener(fontNum -> {
+						int tmp = fontNum - 10;
+						if (tmp < 12)
+							tmp = 12;
+						root.setStyle("-fx-font-size: " + tmp + "pt");
+						alert.getDialogPane().applyCss();
+						alert.getDialogPane().layout();
+						stage.sizeToScene();
+					});
 					alert.showAndWait();
 				});
 				return;
 			}
 			String slug = BowlerStudioMenu.slugify(sizeOfVitaminString);
 			if(!sizeOfVitaminString.contentEquals(slug)) {
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					Alert alert = new Alert(AlertType.WARNING);
 					alert.setTitle("Name Format Wrong");
 					alert.setHeaderText("Name must be without spaces or special chars");
 					alert.setContentText("Changed to "+slug+" confirm to continue...");
 					alert.showAndWait();
-					Platform.runLater(() -> newSizeField.setText(slug));
+					BowlerStudio.runLater(() -> newSizeField.setText(slug));
 				});
 				return;
 			}
@@ -229,15 +247,15 @@ public class NewVitaminWizardController  extends Application {
     		sizeOfVitaminString=sizeComboBox.getSelectionModel().getSelectedItem();
     	}
     		
-		Platform.runLater(() ->nameColumn.setCellValueFactory(new PropertyValueFactory<MeasurmentConfig, String>("key")));
-		Platform.runLater(() ->measurmentColumn.setCellValueFactory(new PropertyValueFactory<MeasurmentConfig, String>("measurment")));
-		Platform.runLater(() ->
+		BowlerStudio.runLater(() ->nameColumn.setCellValueFactory(new PropertyValueFactory<MeasurmentConfig, String>("key")));
+		BowlerStudio.runLater(() ->measurmentColumn.setCellValueFactory(new PropertyValueFactory<MeasurmentConfig, String>("measurment")));
+		BowlerStudio.runLater(() ->
 			measurmentColumn
 			.setCellFactory(
 	                TextFieldTableCell.forTableColumn())
 				);
 		
-		Platform.runLater(() ->measurmentsTable.getSelectionModel().cellSelectionEnabledProperty().set(true));
+		BowlerStudio.runLater(() ->measurmentsTable.getSelectionModel().cellSelectionEnabledProperty().set(true));
 		measurmentsTable.setEditable(true);
 		nameColumn.setEditable(false);
 		measurmentColumn.setEditable(true);
@@ -259,18 +277,30 @@ public class NewVitaminWizardController  extends Application {
 						exists=true;
 				}
 				if(exists) {
-					Platform.runLater(() -> {
+					BowlerStudio.runLater(() -> {
 						Alert alert = new Alert(AlertType.WARNING);
 						alert.setTitle("Size already Exists");
 						alert.setHeaderText("Name must be unique");
 						alert.setContentText("Rename and confirm to continue...");
+						Node root = alert.getDialogPane();
+						Stage stage = (Stage) alert.getDialogPane().getScene().getWindow();
+						stage.setOnCloseRequest(ev -> alert.hide());
+						FontSizeManager.addListener(fontNum -> {
+							int tmp = fontNum - 10;
+							if (tmp < 12)
+								tmp = 12;
+							root.setStyle("-fx-font-size: " + tmp + "pt");
+							alert.getDialogPane().applyCss();
+							alert.getDialogPane().layout();
+							stage.sizeToScene();
+						});
 						alert.showAndWait();
 					});
 					return;
 				}
 			}
 			new Thread(() -> {
-				HashMap<String, Object> configsOld = Vitamins.getConfiguration(typeOfVitaminString, sizeComboBox.getSelectionModel().getSelectedItem());
+				Map<String, Object> configsOld = Vitamins.getConfigurationRW(typeOfVitaminString, sizeComboBox.getSelectionModel().getSelectedItem());
 
 				for(String key:configsOld.keySet().stream().sorted().collect(Collectors.toList())) {
 					setupKeyValueToTable(key, configsOld.get(key),sizeOfVitaminString);
@@ -279,23 +309,15 @@ public class NewVitaminWizardController  extends Application {
 
 		}
 		if(newTypeRadio.isSelected()) {
-			Vitamins.getConfiguration(typeOfVitaminString, sizeOfVitaminString);
+			Vitamins.getConfigurationRW(typeOfVitaminString, sizeOfVitaminString);
 		}
 		
 		if(Vitamins.isActuator(typeOfVitaminString) ||
 				(newTypeRadio.isSelected() && isMotor.isSelected())
 				) {
-			new Thread(() -> {
-				HashMap<String, Object> required = new HashMap<String, Object>();
-				required.put("MaxTorqueNewtonmeters", 0.001);
-				required.put("MaxFreeSpeedRadPerSec", 1);
-				required.put("massKg", 0.001);
-				required.put("shaftType", "dShaft");
-				required.put("shaftSize", "5mm");
-				setRequiredFields(required);
-			}).start();
+			setUpVitaminDefaults();
 		}
-		new Thread(() -> {
+		//new Thread(() -> {
 			HashMap<String, Object> required = new HashMap<String, Object>();
 			required.put("massKg", 0.001);
 			required.put("source", "https://commonwealthrobotics.com");
@@ -304,17 +326,29 @@ public class NewVitaminWizardController  extends Application {
 			required.put("massCentroidY", 0.0);
 			required.put("massCentroidZ", 0.0);
 			setRequiredFields(required);
-		}).start();
+		//}).start();
     	sizePane.setDisable(true);
         measurmentPane.setDisable(false);
         typePane.setDisable(true);
     }
 
+	private void setUpVitaminDefaults() {
+		//new Thread(() -> {
+			HashMap<String, Object> required = new HashMap<String, Object>();
+			required.put("MaxTorqueNewtonmeters", 0.001);
+			required.put("MaxFreeSpeedRadPerSec", 1);
+			required.put("massKg", 0.001);
+			required.put("shaftType", "dShaft");
+			required.put("shaftSize", "5mm");
+			setRequiredFields(required);
+		//}).start();
+	}
+
 	private void setRequiredFields(HashMap<String, Object> required) {
 		// For each vitamin size in a given type
 		
 		for(String size:Vitamins.listVitaminSizes(typeOfVitaminString)) {
-			HashMap<String, Object> configs = Vitamins.getConfiguration(typeOfVitaminString, size);
+			Map<String, Object> configs = Vitamins.getConfigurationRW(typeOfVitaminString, size);
 			// For every required key
 			for(String key:required.keySet().stream().sorted().collect(Collectors.toList())) {
 				// check to see if the current size has this key already
@@ -327,10 +361,10 @@ public class NewVitaminWizardController  extends Application {
 	}
 
 	private void setupKeyValueToTable(String key, Object value, String size) {
-		Vitamins.getConfiguration(typeOfVitaminString, size).put(key, value);
+		Vitamins.putMeasurment(typeOfVitaminString, size,key, value);
 		if (size.contentEquals(sizeOfVitaminString))
-			Platform.runLater(() -> measurmentsTable.getItems()
-					.add(new MeasurmentConfig(key, Vitamins.getConfiguration(typeOfVitaminString, sizeOfVitaminString))));
+			BowlerStudio.runLater(() -> measurmentsTable.getItems()
+					.add(new MeasurmentConfig(key, typeOfVitaminString, sizeOfVitaminString)));
 	}
 
     @FXML
@@ -339,24 +373,48 @@ public class NewVitaminWizardController  extends Application {
     	if(newTypeRadio.isSelected()) {
     		typeOfVitaminString=newTypeNameField.getText();
     		if(typeOfVitaminString.length()<2) {
-    			Platform.runLater(() -> {
+    			BowlerStudio.runLater(() -> {
     				Alert alert = new Alert(AlertType.WARNING);
     				alert.setTitle("No name specified!");
     				alert.setHeaderText("Names must be at least 2 charrectors long");
     				alert.setContentText("Try again...");
+    				Node root = alert.getDialogPane();
+    				Stage stage = (Stage) alert.getDialogPane().getScene().getWindow();
+    				stage.setOnCloseRequest(ev -> alert.hide());
+    				FontSizeManager.addListener(fontNum -> {
+    					int tmp = fontNum - 10;
+    					if (tmp < 12)
+    						tmp = 12;
+    					root.setStyle("-fx-font-size: " + tmp + "pt");
+    					alert.getDialogPane().applyCss();
+    					alert.getDialogPane().layout();
+    					stage.sizeToScene();
+    				});
     				alert.showAndWait();
     			});
     			return;
     		}
     		String slug = BowlerStudioMenu.slugify(typeOfVitaminString);
     		if(!typeOfVitaminString.contentEquals(slug)) {
-    			Platform.runLater(() -> {
+    			BowlerStudio.runLater(() -> {
     				Alert alert = new Alert(AlertType.WARNING);
     				alert.setTitle("Name Format Wrong");
     				alert.setHeaderText("Name must be without spaces or special chars");
     				alert.setContentText("Changed to "+slug+" confirm to continue...");
+    				Node root = alert.getDialogPane();
+    				Stage stage = (Stage) alert.getDialogPane().getScene().getWindow();
+    				stage.setOnCloseRequest(ev -> alert.hide());
+    				FontSizeManager.addListener(fontNum -> {
+    					int tmp = fontNum - 10;
+    					if (tmp < 12)
+    						tmp = 12;
+    					root.setStyle("-fx-font-size: " + tmp + "pt");
+    					alert.getDialogPane().applyCss();
+    					alert.getDialogPane().layout();
+    					stage.sizeToScene();
+    				});
     				alert.showAndWait();
-    				Platform.runLater(() -> newTypeNameField.setText(slug));
+    				BowlerStudio.runLater(() -> newTypeNameField.setText(slug));
     			});
     			
     			return;
@@ -391,6 +449,8 @@ public class NewVitaminWizardController  extends Application {
         		
     		}
     	}
+    	isShaft.setSelected(Vitamins.isShaft(typeOfVitaminString));
+    	isMotor.setSelected(Vitamins.isActuator(typeOfVitaminString));
         measurmentPane.setDisable(true);
         typePane.setDisable(true);
         
@@ -433,7 +493,8 @@ public class NewVitaminWizardController  extends Application {
 			result2.ifPresent(name2 -> { 
 				setupKeyValueToTable(name,name2,sizeOfVitaminString);
 				for(String size:Vitamins.listVitaminSizes(typeOfVitaminString)) {
-					Vitamins.getConfiguration(typeOfVitaminString, size).put(name,name2);
+					Vitamins.putMeasurment(typeOfVitaminString, size,name,name2);
+					
 				}
 			});
 			newMeasurmentButton.setDisable(false);
@@ -447,16 +508,16 @@ public class NewVitaminWizardController  extends Application {
     void onSelectExistingTypeMode(ActionEvent event) {
     	newTypeNameField.setEditable(false);
     	typeComboBox.setDisable(false);
-    	isShaft.setDisable(true);
-		isMotor.setDisable(true);
+    	//isShaft.setDisable(true);
+		//isMotor.setDisable(true);
     }
 
     @FXML
     void onSelectNewTypeMode(ActionEvent event) {
     	newTypeNameField.setEditable(true);
     	typeComboBox.setDisable(true);
-    	isShaft.setDisable(false);
-		isMotor.setDisable(false);
+    	//isShaft.setDisable(false);
+		//isMotor.setDisable(false);
     }
     @FXML
     void onEditExisting(ActionEvent event) {
@@ -470,8 +531,10 @@ public class NewVitaminWizardController  extends Application {
 
     @FXML
     void onIsMotor(ActionEvent event) {
-    	if(isMotor.isSelected())
+    	if(isMotor.isSelected()) {
     		isShaft.setSelected(false);
+			setUpVitaminDefaults();
+    	}
     }
 
     @FXML
@@ -508,13 +571,13 @@ public class NewVitaminWizardController  extends Application {
 			typeComboBox.getSelectionModel().select(types.get(0));
 		else
 			typeComboBox.getSelectionModel().select(typeOfVitaminString);
-		isShaft.setDisable(true);
-		isMotor.setDisable(true);
+		isShaft.setDisable(false);
+		isMotor.setDisable(false);
     }
     
     public static void launchWizard(INewVitaminCallback callback) throws Exception {
     	NewVitaminWizardController.callback=callback;
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			Stage s = new Stage();
 			primaryStage = s;
 			new Thread(() -> {
@@ -567,7 +630,13 @@ public class NewVitaminWizardController  extends Application {
 		// This is needed when loading on MAC
 		loader.setClassLoader(getClass().getClassLoader());
 		root = loader.load();
-		Platform.runLater(() -> {
+		FontSizeManager.addListener(fontNum->{
+			int tmp = fontNum-10;
+			if(tmp<12)
+				tmp=12;
+			root.setStyle("-fx-font-size: "+tmp+"pt");
+		});
+		BowlerStudio.runLater(() -> {
 			primaryStage.setTitle("Edit Vitamins Wizard");
 
 			Scene scene = new Scene(root);

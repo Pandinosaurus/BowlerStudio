@@ -4,10 +4,14 @@ import java.io.File;
 import java.util.Optional;
 
 import org.eclipse.jgit.api.Git;
-import org.jfree.util.Log;
+//import org.jfree.util.Log;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.IssueReportingExceptionHandler;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
+import com.neuronrobotics.sdk.common.Log;
+import com.neuronrobotics.video.OSUtil;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -19,15 +23,18 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.layout.GridPane;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.util.Pair;
 
 public class CommitWidget {
 	public static void commit(File currentFile, String code){
-		if(code.length()<1){
-			Log.error("COmmit failed with no code to commit");
-			return;
-		}
-		Platform.runLater(() ->{
+		if(code!=null)
+			if(code.length()<1){
+				Log.error("COmmit failed with no code to commit");
+				return;
+			}
+		BowlerStudio.runLater(() ->{
 			// Create the custom dialog.
 			Dialog<Pair<String, String>> dialog = new Dialog<>();
 			dialog.setTitle("Commit message Dialog");
@@ -68,7 +75,7 @@ public class CommitWidget {
 			dialog.getDialogPane().setContent(grid);
 	
 			// Request focus on the username field by default.
-			Platform.runLater(() -> username.requestFocus());
+			BowlerStudio.runLater(() -> username.requestFocus());
 	
 			// Convert the result to a username-password-pair when the login button is clicked.
 			dialog.setResultConverter(dialogButton -> {
@@ -77,10 +84,27 @@ public class CommitWidget {
 			    }
 			    return null;
 			});
+			if (OSUtil.isOSX()) {
+				Modality mode = Modality.NONE;
+				dialog.initModality(mode);
+			}
+			System.err.println("Show commit Dialog");
+			Node root = dialog.getDialogPane();
+			Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
 
-			
+			FontSizeManager.addListener(fontNum -> {
+				int tmp = fontNum - 10;
+				if (tmp < 12)
+					tmp = 12;
+				root.setStyle("-fx-font-size: " + tmp + "pt");
+				dialog.getDialogPane().applyCss();
+				dialog.getDialogPane().layout();
+				stage.sizeToScene();
+			});
 			Optional<Pair<String, String>> result = dialog.showAndWait();
-
+			System.err.println("Commit Dialog finished");
+			dialog.close();
+			System.err.println("Result: "+result);
 			result.ifPresent(commitBody -> {
 			    new Thread(){
 			    	public void run(){
@@ -88,17 +112,21 @@ public class CommitWidget {
 
 					    String message = commitBody.getKey()+"\n\n"+commitBody.getValue();
 					    
-					    Git git;
+					    Git git=null;
 						try {
 							git = ScriptingEngine.locateGit(currentFile);
 							String remote= git.getRepository().getConfig().getString("remote", "origin", "url");
-							ScriptingEngine.pull(remote);
 							String relativePath = ScriptingEngine.findLocalPath(currentFile,git);
-						    ScriptingEngine.pushCodeToGit(remote,ScriptingEngine.getFullBranch(remote), relativePath, code, message);
-						    git.close();
+							ScriptingEngine.closeGit(git);
+							ScriptingEngine.pull(remote);
+						    ScriptingEngine.pushCodeToGit(remote,ScriptingEngine.getFullBranch(remote), relativePath, code, message,true);
+						    
 						} catch (Exception e1) {
 							// TODO Auto-generated catch block
 							e1.printStackTrace();
+							if(git!=null)
+								ScriptingEngine.closeGit(git);
+
 						}
 			    	}
 			    }.start();

@@ -36,7 +36,6 @@ import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.reactfx.util.FxTimer;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,8 +51,8 @@ import java.util.Set;
 
 import javax.management.RuntimeErrorException;
 
-public class JogMobileBase extends GridPane implements IGameControlEvent {
-	double defauletSpeed = 0.1;
+public class JogMobileBase extends GridPane implements IGameControlEvent,IJogProvider {
+	double defauletSpeed = 0.3;
 	private MobileBase mobilebase = null;
 	Button px = new Button("", AssetFactory.loadIcon("Plus-X.png"));
 	Button nx = new Button("", AssetFactory.loadIcon("Minus-X.png"));
@@ -230,7 +229,6 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 
 		add(buttons, 0, 0);
 
-		controllerLoop();
 		try {
 			
 			currentFile = ScriptingEngine.fileFromGit("https://github.com/OperationSmallKat/Katapult.git", "launch.groovy");
@@ -280,27 +278,25 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 	}
 	private void reset() {
 		running = false;
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			game.setText("Run Game Controller");
-			//game.setGraphic(AssetFactory.loadIcon("Run.png"));
-			game.setBackground(new Background(new BackgroundFill(Color.LIGHTGREEN, CornerRadii.EMPTY, Insets.EMPTY)));
-			
+			BowlerStudio.setToRunButton(game);	
+			game.setGraphic(AssetFactory.loadIcon("Add-Game-Controller.png"));
 		});
 
 	}
 
 	public void stop() {
-		// TODO Auto-generated method stub
-
 		reset();
-		if (scriptRunner != null)
-			while (scriptRunner.isAlive()) {
+		Thread tmp = scriptRunner;
+		if (tmp != null)
+			while (tmp.isAlive()) {
 
 				Log.debug("Interrupting");
 				ThreadUtil.wait(10);
 				try {
-					scriptRunner.interrupt();
-					scriptRunner.join();
+					tmp.interrupt();
+					tmp.join();
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -314,10 +310,10 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 
 
 		running = true;
-		Platform.runLater(()->{
+		BowlerStudio.runLater(()->{
 			game.setText("Stop Game Controller");
 			//game.setGraphic(AssetFactory.loadIcon("Stop.png"));
-			game.setBackground(new Background(new BackgroundFill(Color.RED, CornerRadii.EMPTY, Insets.EMPTY)));
+			BowlerStudio.setToStopButton(game);
 		});
 		scriptRunner = new Thread() {
 
@@ -346,7 +342,7 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 	}
 
 	private void handle(final Button button) {
-
+		JogThread.setProvider(this, mobilebase);
 		if (!button.isPressed()) {
 			// button released
 			// Log.info(button.getText()+" Button released ");
@@ -422,24 +418,32 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 			return;
 		}
 		stop = false;
-		controllerLoop();
 	}
 
 	public void home() {
 
 		getMobilebase().setGlobalToFiducialTransform(new TransformNR());
-		for (DHParameterKinematics c : getMobilebase().getAllDHChains()) {
+		homeBase( getMobilebase());
+
+	}
+	
+	private void homeBase(MobileBase mb) {
+		for (DHParameterKinematics c : mb.getAllDHChains()) {
 			homeLimb(c);
 		}
 	}
 
-	private void homeLimb(AbstractKinematicsNR c) {
+	private void homeLimb(DHParameterKinematics c) {
 		double[] joints = c.getCurrentJointSpaceVector();
 		for (int i = 0; i < c.getNumberOfLinks(); i++) {
 			joints[i] = 0;
+			if(c.getFollowerMobileBase(i)!=null) {
+				homeBase(c.getFollowerMobileBase(i));
+			}
 		}
 		try {
-			c.setDesiredJointSpaceVector(joints, 0);
+			double time =c.getBestTime(joints);
+			c.setDesiredJointSpaceVector(joints, time);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -447,70 +451,10 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 
 	}
 
-	private void controllerLoop() {
-		new Thread(() -> {
-			// System.out.println("controllerLoop");
-			double seconds = .1;
-			if ( stop == false) {
-				try {
-					seconds = Double.parseDouble(sec.getText());
-					if (!stop) {
-
-						double inc;
-						try {
-							inc = Double.parseDouble(increment.getText()) * 1000 * seconds;// convert to mm
-
-						} catch (Exception e) {
-							inc = defauletSpeed;
-							Platform.runLater(() -> {
-								try {
-									increment.setText(Double.toString(defauletSpeed));
-								} catch (Exception ex) {
-									ex.printStackTrace();
-								}
-							});
-						}
-						// double rxl=0;
-						double ryl = inc / 20 * slider;
-						double rzl = inc / 2 * rz;
-						TransformNR current = new TransformNR(0, 0, 0, new RotationNR(0, rzl, 0));
-						current.translateX(inc * x);
-						current.translateY(inc * y);
-						current.translateZ(inc * slider);
-
-						try {
-							TransformNR toSet = current.copy();
-							double toSeconds = seconds;
-							JogThread.setTarget(mobilebase, toSet, toSeconds);
-
-						} catch (Exception e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				if (seconds < .01) {
-					seconds = .01;
-					Platform.runLater(() -> sec.setText(".01"));
-				}
-				FxTimer.runLater(Duration.ofMillis((int) (seconds * 1000.0)), new Runnable() {
-					@Override
-					public void run() {
-
-						controllerLoop();
-
-						// System.out.println("Controller loop!");
-					}
-				});
-			}
-		}).start();
-	}
 
 	@Override
 	public void onEvent(String name, float value) {
-
+		JogThread.setProvider(this, mobilebase);
 		if (name.toLowerCase()
 				.contentEquals((String) ConfigurationDatabase.getObject(paramsKey, "jogKiny", "y")))
 			x = value;
@@ -546,6 +490,37 @@ public class JogMobileBase extends GridPane implements IGameControlEvent {
 
 	public void setMobilebase(MobileBase mobilebase) {
 		this.mobilebase = mobilebase;
+	}
+
+	@Override
+	public TransformNR getJogIncrement() {
+		if (!stop) {
+
+			double inc;
+			try {
+				inc = Double.parseDouble(increment.getText()) * 10;// convert to mm
+
+			} catch (Exception e) {
+				inc = defauletSpeed;
+				BowlerStudio.runLater(() -> {
+					try {
+						increment.setText(Double.toString(defauletSpeed));
+					} catch (Exception ex) {
+						ex.printStackTrace();
+					}
+				});
+			}
+			// double rxl=0;
+			double ryl = inc / 20 * slider;
+			double rzl = inc / 2 * rz;
+			TransformNR current = new TransformNR(0, 0, 0, new RotationNR(0, rzl, 0));
+			current.translateX(inc * x);
+			current.translateY(inc * y);
+			current.translateZ(inc * slider);
+			TransformNR toSet = current.copy();
+			return toSet;
+		}
+		return null;
 	}
 
 

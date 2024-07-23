@@ -2,8 +2,8 @@ package com.neuronrobotics.bowlerstudio.creature;
 
 import java.time.Duration;
 
-import org.reactfx.util.FxTimer;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.BowlerStudioController;
 import com.neuronrobotics.bowlerstudio.IssueReportingExceptionHandler;
 import com.neuronrobotics.bowlerstudio.assets.ConfigurationDatabase;
@@ -12,7 +12,6 @@ import com.neuronrobotics.sdk.addons.gamepad.BowlerJInputDevice;
 import com.neuronrobotics.sdk.addons.gamepad.IGameControlEvent;
 import com.neuronrobotics.sdk.addons.kinematics.AbstractKinematicsNR;
 import com.neuronrobotics.sdk.addons.kinematics.AbstractLink;
-import com.neuronrobotics.sdk.addons.kinematics.DHLink;
 import com.neuronrobotics.sdk.addons.kinematics.DHParameterKinematics;
 import com.neuronrobotics.sdk.addons.kinematics.DhLinkType;
 import com.neuronrobotics.sdk.addons.kinematics.IJointSpaceUpdateListenerNR;
@@ -23,50 +22,25 @@ import com.neuronrobotics.sdk.addons.kinematics.LinkConfiguration;
 import com.neuronrobotics.sdk.addons.kinematics.MobileBase;
 import com.neuronrobotics.sdk.addons.kinematics.math.RotationNR;
 import com.neuronrobotics.sdk.addons.kinematics.math.TransformNR;
-import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.pid.PIDLimitEvent;
 import com.neuronrobotics.sdk.util.ThreadUtil;
-import com.sun.javafx.geom.transform.Affine3D;
-import com.sun.javafx.geom.transform.BaseTransform;
-
-import eu.hansolo.medusa.Gauge;
-import eu.hansolo.medusa.Gauge.KnobType;
-import eu.hansolo.medusa.Gauge.NeedleShape;
-import eu.hansolo.medusa.Gauge.SkinType;
-import eu.hansolo.medusa.GaugeBuilder;
-import eu.hansolo.medusa.LcdDesign;
-import eu.hansolo.medusa.LcdFont;
-import eu.hansolo.medusa.Section;
-import eu.hansolo.medusa.TickLabelLocation;
-import eu.hansolo.medusa.TickLabelOrientation;
-import eu.hansolo.medusa.TickMarkType;
-import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.Scene;
-import javafx.scene.control.Accordion;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TitledPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.transform.Affine;
-import javafx.scene.transform.Transform;
-import javafx.stage.Stage;
 
 @SuppressWarnings("restriction")
 public class LinkSliderWidget extends Group
-		implements IGameControlEvent, IOnEngineeringUnitsChange, ILinkListener, ILinkConfigurationChangeListener {
+		implements IGameControlEvent, IOnEngineeringUnitsChange, ILinkListener, ILinkConfigurationChangeListener, IJointSpaceUpdateListenerNR {
 	private AbstractKinematicsNR device;
 	private DHParameterKinematics dhdevice;
 
@@ -86,6 +60,7 @@ public class LinkSliderWidget extends Group
 
 	private LinkConfigurationWidget theWidget;
 	private TextField engineeringUpper = new TextField("0");
+	private TextField engineeringVelUpper = new TextField("0");
 	private TextField engineeringLower = new TextField("0");
 	private Label engineeringTotalLimited = new Label("0");
 	private Label engineeringTotalPossible = new Label("0");
@@ -95,12 +70,16 @@ public class LinkSliderWidget extends Group
 	private static LinkGaugeController linkGaugeController3d = null;// = new LinkGaugeController();
 	private static Affine offsetGauge = null;
 	private static Affine offsetGaugeTranslate = null;
-	public LinkSliderWidget(int linkIndex, DHParameterKinematics d, LinkConfigurationWidget theWidget) {
-		this.theWidget = theWidget;
-		setTrimController(theWidget);
+	private boolean isNowVis=false;
+	private TransformWidget poseOfLink;
+	public LinkSliderWidget(int linkIndex, DHParameterKinematics d, MobileBase base,boolean addLimits, boolean displayLinkCOnfiguration) {
+
 		this.linkIndex = linkIndex;
 		this.device = d;
 		this.conf = d.getLinkConfiguration(linkIndex);
+		this.theWidget = new LinkConfigurationWidget(conf, d.getFactory(),
+				MobileBaseCadManager.get(base));
+		setTrimController(this.theWidget);
 		conf.addChangeListener(this);
 		if (DHParameterKinematics.class.isInstance(device)) {
 			dhdevice = (DHParameterKinematics) device;
@@ -130,10 +109,10 @@ public class LinkSliderWidget extends Group
 																		// 300
 																		// wide
 		jogminus.setOnAction(event -> {
-			getTrimController().trimMinus();
+			if(theWidget!=null)getTrimController().trimMinus();
 		});
 		jogplus.setOnAction(event -> {
-			getTrimController().trimPlus();
+			if(theWidget!=null)getTrimController().trimPlus();
 		});
 
 		LinkGaugeController linkGaugeController = new LinkGaugeController();
@@ -148,11 +127,11 @@ public class LinkSliderWidget extends Group
 				}
 				double linkUnits = getAbstractLink().toLinkUnits(num);
 				if (conf.getScale() > 0)
-					theWidget.setUpperBound(linkUnits);
+					if(theWidget!=null)theWidget.setUpperBound(linkUnits);
 				else
-					theWidget.setLowerBound(linkUnits);
+					if(theWidget!=null)theWidget.setLowerBound(linkUnits);
 			} catch (Exception e) {
-				Platform.runLater(() -> engineeringUpper
+				BowlerStudio.runLater(() -> engineeringUpper
 						.setText(String.format("%.2f", getAbstractLink().getMaxEngineeringUnits())));
 			}
 		});
@@ -164,12 +143,22 @@ public class LinkSliderWidget extends Group
 				}
 				double linkUnits = getAbstractLink().toLinkUnits(num);
 				if (conf.getScale() < 0)
-					theWidget.setUpperBound(linkUnits);
+					if(theWidget!=null)theWidget.setUpperBound(linkUnits);
 				else
-					theWidget.setLowerBound(linkUnits);
+					if(theWidget!=null)theWidget.setLowerBound(linkUnits);
 			} catch (Exception e) {
-				Platform.runLater(() -> engineeringLower
+				BowlerStudio.runLater(() -> engineeringLower
 						.setText(String.format("%.2f", getAbstractLink().getMinEngineeringUnits())));
+			}
+		});
+		
+		engineeringVelUpper.setOnAction(event -> {
+			try {
+				double num = Double.parseDouble(engineeringVelUpper.getText());
+				getAbstractLink().setMaxVelocityEngineeringUnits(num);
+			} catch (Exception e) {
+				BowlerStudio.runLater(() -> engineeringVelUpper
+						.setText(String.format("%.2f", getAbstractLink().getMaxVelocityEngineeringUnits())));
 			}
 		});
 
@@ -208,27 +197,112 @@ public class LinkSliderWidget extends Group
 		calibration.getColumnConstraints().add(new ColumnConstraints(180));
 		calibration.getColumnConstraints().add(new ColumnConstraints(120));
 		calibration.getRowConstraints().add(new RowConstraints(120));
-		calibration.getRowConstraints().add(new RowConstraints(150));
+		calibration.getRowConstraints().add(new RowConstraints(60));
+		if(displayLinkCOnfiguration)calibration.getRowConstraints().add(new RowConstraints(150));
+		
+		HBox velocityLim = new HBox();
+		VBox velocitylimits = new VBox();
+		velocityLim.getChildren().add(new Label("Velocity Limit"));
+		velocitylimits.getChildren().addAll( engineeringVelUpper,new Label("deg/sec"));
+		velocityLim.getChildren().add(velocitylimits);
 
-		calibration.add(trimBox, 1, 1);
+		
 		calibration.add(limits, 0, 0);
 		calibration.add(limits1, 1, 0);
-		calibration.add(gauge, 0, 1);
+		calibration.add(velocityLim, 0, 1);
+		if(displayLinkCOnfiguration)calibration.add(trimBox, 1, 2);
+		if(displayLinkCOnfiguration)calibration.add(gauge, 0, 2);
 
 		VBox allParts = new VBox();
-		allParts.getChildren().addAll(panel, calibration, theWidget);
+		allParts.getChildren().addAll(panel);
+		if(addLimits)allParts.getChildren().addAll(calibration);
+		if(displayLinkCOnfiguration)allParts.getChildren().addAll(theWidget);
+		poseOfLink = new TransformWidget("Link Tip Pose", new TransformNR(), new IOnTransformChange() {
+			
+			@Override
+			public void onTransformFinished(TransformNR newTrans) {
+				// TODO Auto-generated method stub
+				
+			}
+			
+			@Override
+			public void onTransformChaging(TransformNR newTrans) {
+				// TODO Auto-generated method stub
+				
+			}
+		});
+		parentProperty().addListener((observable, oldValue, newValue) -> {
+			System.out.println("Changed visibility of linkslider " + newValue);
+			isNowVis = newValue != null;
+			if (isNowVis) {
+				event(conf);
+				double[] currentJointSpaceVector = device.getCurrentJointSpaceVector();
+
+				updateLinkPose(linkIndex, dhdevice, poseOfLink, currentJointSpaceVector);
+				try {
+					getSetpoint().setValue(currentJointSpaceVector[linkIndex]);
+				} catch (Exception ex) {
+					return;
+				}
+
+			}
+		});
+		d.addJointSpaceListener(this);
+		poseOfLink.setDisable(true);
+		if(displayLinkCOnfiguration)allParts.getChildren().addAll(poseOfLink);
 		getChildren().add(allParts);
 		getAbstractLink().addLinkListener(this);
 		// device.addJointSpaceListener(this);
 		event(conf);
 	}
-
+	
+		
+	@Override
+	public void onJointSpaceUpdate(AbstractKinematicsNR source, double[] joints) {
+		if(!isNowVis)
+			return;
+		updateLinkPose(linkIndex, dhdevice, poseOfLink, joints);
+	}
+	
+	@Override
+	public void onJointSpaceTargetUpdate(AbstractKinematicsNR source, double[] joints) {
+		
+	}
+	
+	@Override
+	public void onJointSpaceLimit(AbstractKinematicsNR source, int axis, JointLimit event) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	private void updateLinkPose(int linkIndex, DHParameterKinematics d, TransformWidget poseOfLink,
+			double[] joints) {
+		if (linkIndex>=joints.length) {
+			d.removeJointSpaceUpdateListener(this);
+			return;
+		}
+		try {
+			TransformNR linkTip;
+			try {
+				linkTip = d.getLinkTip(linkIndex);
+				if(linkTip==null)
+					throw new RuntimeException();
+			}catch(Exception e) {
+				linkTip=d.getChain().getChain(d.getCurrentJointSpaceVector()).get(linkIndex);
+			}
+			if(poseOfLink!=null && linkTip!=null)
+				poseOfLink.updatePose(linkTip);
+		}catch(Throwable t) {
+			t.printStackTrace();
+		}
+	}
 	@Override
 	public void event(LinkConfiguration newConf) {
+		conf = newConf;
 		double rANGE = getAbstractLink().getMaxEngineeringUnits() - getAbstractLink().getMinEngineeringUnits();
 		double theoreticalRange = getAbstractLink().getDeviceMaxEngineeringUnits()
 				- getAbstractLink().getDeviceMinEngineeringUnits();
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			engineeringTotalPossible.setText("Possible Range "
 					+ String.format("%.2f", theoreticalRange));
 			engineeringTotalLimited.setText("Link Range " + String.format("%.2f", rANGE));
@@ -236,23 +310,12 @@ public class LinkSliderWidget extends Group
 			engineeringLower.setText(String.format("%.2f", getAbstractLink().getMinEngineeringUnits()));
 			engineeringUpperPossible.setText(String.format("%.2f", getAbstractLink().getDeviceMaxEngineeringUnits()));
 			engineeringLowerPossible.setText(String.format("%.2f", getAbstractLink().getDeviceMinEngineeringUnits()));
+			engineeringVelUpper.setText(String.format("%.1f", getAbstractLink().getMaxVelocityEngineeringUnits()));
 
 		});
 		getSetpoint().setLowerBound(getAbstractLink().getMinEngineeringUnits());
 		getSetpoint().setUpperBound(getAbstractLink().getMaxEngineeringUnits());
-		if(device.checkTaskSpaceTransform(device.getCurrentPoseTarget()))
-			try {
-				device.setDesiredTaskSpaceTransform(device.getCurrentPoseTarget(), 0);
-			} catch (Exception e) {
-				try {
-					device.setDesiredTaskSpaceTransform(device.calcHome(), 0);
-				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					new IssueReportingExceptionHandler().uncaughtException(Thread.currentThread(), e1);
-					
-				}
 
-			}
 	}
 
 	public void setUpperBound(double newBound) {
@@ -271,7 +334,7 @@ public class LinkSliderWidget extends Group
 				jogTHreadHandle.setToSet(slider + getSetpoint().getValue(), seconds);
 			}
 
-			FxTimer.runLater(Duration.ofMillis((int) (seconds * 1000.0)), new Runnable() {
+			BowlerStudio.runLater(Duration.ofMillis((int) (seconds * 1000.0)), new Runnable() {
 				@Override
 				public void run() {
 					controllerLoop();
@@ -382,6 +445,8 @@ public class LinkSliderWidget extends Group
 
 	@Override
 	public void onLinkPositionUpdate(AbstractLink arg0, double arg1) {
+		if(!isNowVis)
+			return;
 		if(getSetpoint().isEditing())
 			return;
 		// TODO Auto-generated method stub
@@ -426,14 +491,14 @@ public class LinkSliderWidget extends Group
 		TransformNR offsetter2 = new TransformNR()
 				.translateX(-d )
 				.translateY(-d );
-		Platform.runLater(() -> TransformFactory.nrToAffine(offsetter2, offsetGaugeTranslate));
+		BowlerStudio.runLater(() -> TransformFactory.nrToAffine(offsetter2, offsetGaugeTranslate));
 
 		TransformNR offsetter = new TransformNR();
 
 		double theta = Math.toDegrees(device.getDhParametersChain().getLinks().get(linkIndex).getTheta());
 		offsetter.setRotation(new RotationNR(0, 90 + theta, 0));
 
-		Platform.runLater(() -> TransformFactory.nrToAffine(offsetter, offsetGauge));
+		BowlerStudio.runLater(() -> TransformFactory.nrToAffine(offsetter, offsetGauge));
 
 		linkGaugeController3d.getGauge().getTransforms().clear();
 		linkGaugeController3d.setLink(conf, getAbstractLink());

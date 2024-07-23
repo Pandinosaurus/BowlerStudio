@@ -2,8 +2,13 @@ package com.neuronrobotics.bowlerstudio.threed;
 
 import java.util.Arrays;
 
-import javafx.application.Platform;
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 
+import eu.mihosoft.vrl.v3d.CSG;
+import eu.mihosoft.vrl.v3d.Cube;
+import eu.mihosoft.vrl.v3d.TextExtrude;
+import javafx.application.Platform;
+import javafx.scene.text.Font;
 /*
  *      Axis.java 1.0 98/11/25
  *
@@ -50,10 +55,6 @@ import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.PhongMaterial;
-import javafx.scene.shape.Box;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Sphere;
 import javafx.scene.transform.Affine;
 
 // TODO: Auto-generated Javadoc
@@ -62,18 +63,18 @@ import javafx.scene.transform.Affine;
  */
 public class Axis extends Group {
 
-	private Line3D xAxis;
-	private Line3D yAxis;
-	private Line3D zAxis;
-	private Label xText;
-	private Label yText;
-	private Label zText;
+	private CSG xAxis;
+	private CSG yAxis;
+	private CSG zAxis;
+	private CSG xText;
+	private CSG yText;
+	private CSG zText;
 
 	/**
 	 * Instantiates a new axis.
 	 */
-	public Axis() {
-		this(50);
+	public Axis(boolean isVis) {
+		this(50,isVis);
 	}
 
 	// //////////////////////////////////////////
@@ -85,17 +86,22 @@ public class Axis extends Group {
 	 * @param i the i
 	 */
 	//
-	public Axis(int i) {
+	public Axis(int i,boolean isVis) {
+		double strokWidth = 0.5;
 
 		Affine xp = new Affine();
 		xp.setTx(i / 2);
-		xText = new Label("+X");
-		xText.getTransforms().add(xp);
+		Font font = new Font("Arial",  5);
+
+		
+
+		xText = CSG.unionAll(TextExtrude.text((double)strokWidth,"X",font)).movex(i).moveToCenterY();
+		//xText.getTransforms().add(xp);
 
 		Affine yp = new Affine();
 		yp.setTy(i / 2);
-		yText = new Label("+Y");
-		yText.getTransforms().add(yp);
+		yText = CSG.unionAll(TextExtrude.text((double)strokWidth,"Y",font)).rotz(90).toYMin().movey(i).moveToCenterX();
+		//yText.getTransforms().add(yp);
 
 		// zp.setTz(i/2);
 		Affine zTextAffine = new Affine();
@@ -103,42 +109,49 @@ public class Axis extends Group {
 		zTextAffine.setTx(i / 2);
 		zTextAffine.appendRotation(-90, 0, 0, 0, 1, 0, 0);
 		zTextAffine.appendRotation(180, 0, 0, 0, 0, 0, 1);
-		zText = new Label("+Z");
-		zText.getTransforms().add(zTextAffine);
+		zText = CSG.unionAll(TextExtrude.text((double)strokWidth,"Z",font)).rotx(90).rotz(90).movez(i).moveToCenterY();
+		//zText.getTransforms().add(zTextAffine);
 		// zText.smoothProperty().set(false);
-		double strokWidth = 0.1;
-		double inset = 0;
-		xAxis = new Line3D(0, inset, 0, i, inset, 0);
-		yAxis = new Line3D(inset, 0, 0, inset, i, 0);
-		zAxis = new Line3D(inset, 0, 0, inset, 0, i);
+		xAxis = new Cube(i, strokWidth, strokWidth).toCSG().toXMin();
+		yAxis = new Cube( strokWidth,i, strokWidth).toCSG().toYMin();
+		zAxis = new Cube( strokWidth, strokWidth,i).toCSG().toZMin();
+		xText.setColor(Color.RED);
 
-		xAxis.setStrokeWidth(strokWidth);
-		xAxis.setStroke(Color.RED);
+		yText.setColor(Color.GREEN);
 
-		yAxis.setStrokeWidth(strokWidth);
-		yAxis.setStroke(Color.GREEN);
+		zText.setColor(Color.BLUE);
+		xAxis.setColor(Color.RED);
 
-		zAxis.setStrokeWidth(strokWidth);
-		zAxis.setStroke(Color.BLUE);
+		yAxis.setColor(Color.GREEN);
 
-		show();
+		zAxis.setColor(Color.BLUE);
+		if(isVis)
+			show();
+		else
+			hide();
 	}
 
 	public void show() {
-		Platform.runLater(() -> showAll());
+		BowlerStudio.runLater(() -> showAll());
 	}
 
 	private void showAll() {
-		for (Node n : Arrays.asList(xAxis, yAxis, zAxis, xText, yText, zText)) {
-			try {
-				getChildren().add(n);
-			} catch (Exception e) {
+		try {
+			for (Node n : Arrays.asList(xAxis.getMesh(), yAxis.getMesh(), zAxis.getMesh(), xText.getMesh(), yText.getMesh(), zText.getMesh())) {
+				try {
+					n.setPickOnBounds(false);
+					n.setMouseTransparent(true);
+					getChildren().add(n);
+				} catch (Exception e) {
+				}
 			}
+		}catch(Exception ex) {
+			// no exception on exit
 		}
 	}
 
 	public void hide() {
-		Platform.runLater(() -> getChildren().removeAll(xAxis, yAxis, zAxis, xText, yText, zText));
+		BowlerStudio.runLater(() -> getChildren().clear());
 	}
 
 } // end of class Axis

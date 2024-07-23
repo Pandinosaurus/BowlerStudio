@@ -15,9 +15,12 @@ import com.neuronrobotics.sdk.addons.kinematics.MobileBase;
 import com.neuronrobotics.sdk.bootloader.NRBootLoader;
 import com.neuronrobotics.sdk.bowlercam.device.BowlerCamDevice;
 import com.neuronrobotics.sdk.common.BowlerAbstractDevice;
+import com.neuronrobotics.sdk.common.DMDevice;
 import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.common.RpcEncapsulation;
 import com.neuronrobotics.sdk.dyio.DyIO;
+import com.neuronrobotics.sdk.util.ThreadUtil;
+
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.event.EventHandler;
@@ -152,7 +155,12 @@ public class PluginManager {
 		
 		for( DeviceSupportPluginMap c:deviceSupport){
 			if(c.getDevice().isInstance(dev)){
-				Button launcher = new Button(c.getPlugin().getSimpleName(), AssetFactory.loadIcon("Plugin-Icon.png"));
+				Button launcher;
+				try {
+					launcher= new Button(c.getPlugin().getSimpleName(), AssetFactory.loadIcon("Plugin-Icon.png"));
+				}catch(RuntimeException e) {
+					launcher= new Button(c.getPlugin().getSimpleName());
+				}
 				launcher.setTooltip(new javafx.scene.control.Tooltip("Launch plugin to "+c.getPlugin().getSimpleName()));
 				try {// These tabs are the select few to autoload when a device of theis type is connected
 					if( 	
@@ -175,14 +183,23 @@ public class PluginManager {
 					e.printStackTrace();
 					
 				}
+				Button l=launcher;
 				launcher.setOnAction(b ->{
-					launchTab( c,launcher);
+					launchTab( c,l);
 		        });
 					
 				pluginLauncher.getChildren().add(launcher);
 			}
 		}
-		TitledPane info = new TitledPane("Device Info", new Text(dev.getClass().getSimpleName()));
+		String simpleName = dev.getClass().getSimpleName();
+		if(DMDevice.class.isInstance((dev))){
+			simpleName = ((DMDevice)dev).getWrapped().getClass().getSimpleName();
+		}
+		
+		Text text = new Text("\n"+simpleName+"\n");
+		
+		TitledPane info = new TitledPane("Device Info", text);
+		
 		TitledPane protocol = new TitledPane("Bowler Protocol",  getBowlerBrowser());
 		TitledPane pluginsPane = new TitledPane("Plugins",  pluginLauncher);
 		info.setGraphic(AssetFactory.loadIcon("Info.png"));
@@ -205,7 +222,11 @@ public class PluginManager {
 					AbstractBowlerStudioTab t = generateTab(c);
 
 					// allow the threads to finish before adding
-					//ThreadUtil.wait(50);
+					ThreadUtil.wait(150);
+					if(t.getContent()==null) {
+						System.out.println("ERROR tab failed to load!");
+						return;
+					}
 					getBowlerStudioController().addTab(t, true);
 					
 					t.setOnCloseRequest(new EventHandler<Event>() {
@@ -213,11 +234,11 @@ public class PluginManager {
 						public void handle(Event arg0) {
 							System.out.println("PM is Closing "+t.getText());
 							t.onTabClosing();
-							Platform.runLater(()->launcher.setDisable(false));
+							BowlerStudio.runLater(()->launcher.setDisable(false));
 							
 						}
 					});
-					Platform.runLater(()->{
+					BowlerStudio.runLater(()->{
 						launcher.setDisable(true);
 					});	
 					System.out.println("Launching "+c.getPlugin().getSimpleName());

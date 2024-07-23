@@ -1,7 +1,9 @@
 package com.neuronrobotics.bowlerstudio.utils;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.BowlerStudioController;
 import com.neuronrobotics.bowlerstudio.assets.AssetFactory;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 import com.neuronrobotics.sdk.common.BowlerDatagram;
 import com.neuronrobotics.sdk.common.DeviceManager;
 import com.neuronrobotics.sdk.common.Log;
@@ -183,12 +185,12 @@ public class BowlerConnectionMenu extends Application {
 	}
 
 	private void runsearchSerial() {
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			portOptions.getItems().clear();
 			new Thread(() -> {
 
 				for (String s : SerialConnection.getAvailableSerialPorts()) {
-					Platform.runLater(() -> portOptions.getItems().add(s));
+					BowlerStudio.runLater(() -> portOptions.getItems().add(s));
 				}
 			}).start();
 		});
@@ -196,9 +198,9 @@ public class BowlerConnectionMenu extends Application {
 	}
 
 	private void runsearchNetwork() {
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			ipSelector.getItems().clear();
-			Platform.runLater(() -> ipSelector.getItems().add("127.0.0.1"));
+			BowlerStudio.runLater(() -> ipSelector.getItems().add("127.0.0.1"));
 			new Thread(() -> {
 				// System.out.println("Searching for UDP devices, please
 				// wait...");
@@ -207,13 +209,13 @@ public class BowlerConnectionMenu extends Application {
 					prt = new Integer(udpPort.getText());
 				} catch (NumberFormatException e) {
 					prt = defaultPortNum;
-					Platform.runLater(() -> udpPort.setText(new Integer(defaultPortNum).toString()));
+					BowlerStudio.runLater(() -> udpPort.setText(new Integer(defaultPortNum).toString()));
 				}
 				clnt = new UDPBowlerConnection(prt);
 				ArrayList<InetAddress> addrs = clnt.getAllAddresses();
 
 				for (InetAddress i : addrs) {
-					Platform.runLater(() -> ipSelector.getItems().add(i.getHostAddress()));
+					BowlerStudio.runLater(() -> ipSelector.getItems().add(i.getHostAddress()));
 				}
 
 			}).start();
@@ -230,8 +232,13 @@ public class BowlerConnectionMenu extends Application {
 		// This is needed when loading on MAC
 		loader.setClassLoader(getClass().getClassLoader());
 		root = loader.load();
-
-		Platform.runLater(() -> {
+		FontSizeManager.addListener(fontNum->{
+			int tmp = fontNum-10;
+			if(tmp<12)
+				tmp=12;
+			root.setStyle("-fx-font-size: "+tmp+"pt");
+		});
+		BowlerStudio.runLater(() -> {
 			primaryStage.setTitle("Bowler Device Connection");
 
 			Scene scene = new Scene(root);

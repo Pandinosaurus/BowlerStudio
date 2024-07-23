@@ -1,5 +1,6 @@
 package com.neuronrobotics.bowlerstudio.creature;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.sdk.addons.kinematics.AbstractLink;
 import com.neuronrobotics.sdk.addons.kinematics.ILinkConfigurationChangeListener;
 import com.neuronrobotics.sdk.addons.kinematics.ILinkListener;
@@ -26,7 +27,7 @@ public class LinkGaugeController implements ILinkListener, ILinkConfigurationCha
 	private Section boundsPossible;
 	private LinkConfiguration conf;
 	private AbstractLink link;
-
+	private boolean isNowVis=false;
 	public Gauge getGauge() {
 		if (gauge == null) {
 			double spread = 60;
@@ -55,10 +56,21 @@ public class LinkGaugeController implements ILinkListener, ILinkConfigurationCha
 					.sectionsVisible(true)
 					.sections(boundsPossible, bounds)
 					.build();
-			Platform.runLater(() -> {
+			BowlerStudio.runLater(() -> {
 				gauge.setInteractive(false);
 				gauge.setTitle("");
 				turnOffPickOnBoundsFor(gauge);
+			});
+			gauge.parentProperty().addListener((observable, oldValue, newValue) ->        {
+				BowlerStudio.runLater(()->{
+				    isNowVis=newValue!=null;
+				    if(isNowVis) {
+				    	event(conf);
+				    	if(gauge!=null && link!=null)
+				    		gauge.setValue(link.getCurrentEngineeringUnits());
+				    }
+				});
+
 			});
 			
 		}
@@ -97,7 +109,9 @@ public class LinkGaugeController implements ILinkListener, ILinkConfigurationCha
 
 	@Override
 	public void event(LinkConfiguration newConf) {
-		Platform.runLater(() -> {
+		if(!isNowVis||getAbstractLink()==null)
+			return;
+		BowlerStudio.runLater(() -> {
 			bounds.setStart(getAbstractLink().getMinEngineeringUnits());
 			bounds.setStop(getAbstractLink().getMaxEngineeringUnits());
 			boundsPossible.setStart(getAbstractLink().getDeviceMinEngineeringUnits());
@@ -108,7 +122,9 @@ public class LinkGaugeController implements ILinkListener, ILinkConfigurationCha
 
 	@Override
 	public void onLinkPositionUpdate(AbstractLink source, double engineeringUnitsValue) {
-		Platform.runLater(() -> gauge.setValue(engineeringUnitsValue));
+		if(!isNowVis)
+			return;
+		BowlerStudio.runLater(() -> gauge.setValue(engineeringUnitsValue));
 	}
 
 	@Override

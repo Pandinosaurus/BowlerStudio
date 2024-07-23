@@ -1,5 +1,6 @@
 package com.neuronrobotics.bowlerstudio.threed;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.physics.TransformFactory;
 import com.neuronrobotics.sdk.addons.kinematics.math.RotationNR;
 import com.neuronrobotics.sdk.addons.kinematics.math.TransformNR;
@@ -37,15 +38,13 @@ public class VirtualCameraMobileBase {
 
 		manipulationFrame = new Group();
 		camera.getTransforms().add(zoomAffine);
-		Platform.runLater(
+		BowlerStudio.runLater(
 				() -> TransformFactory.nrToAffine(new TransformNR(0, 0, 0, new RotationNR(180, 0, 0)), offset));
 		cameraFrame.getTransforms().add(getOffset());
 		manipulationFrame.getChildren().addAll(camera, hand);
 		manipulationFrame.getTransforms().add(camerUserPerspective);
 		cameraFrame.getChildren().add(manipulationFrame);
-		// new RuntimeException().printStackTrace();
 		setZoomDepth(DEFAULT_ZOOM_DEPTH);
-		Platform.runLater(() -> updatePositions());
 	}
 
 	public void setGlobalToFiducialTransform(TransformNR defautcameraView) {
@@ -89,7 +88,12 @@ public class VirtualCameraMobileBase {
 		setGlobalToFiducialTransform(global);
 		
 	}
-
+	public TransformNR getCamerFrame() {
+		TransformNR offset = TransformFactory.affineToNr(getOffset());
+		TransformNR fiducialToGlobalTransform = getFiducialToGlobalTransform();
+		return offset.times(fiducialToGlobalTransform);
+	}
+	
 	public PerspectiveCamera getCamera() {
 		return camera;
 	}
@@ -111,11 +115,15 @@ public class VirtualCameraMobileBase {
 	}
 
 	public void setZoomDepth(double zoomDepth) {
-		if (zoomDepth > -2)
-			zoomDepth = -2;
-		if (zoomDepth < -5000)
-			zoomDepth = -5000;
+		if (zoomDepth > 2)
+			zoomDepth = 2;
+		if (zoomDepth < -9000)
+			zoomDepth = -9000;
 		this.zoomDepth = zoomDepth;
+		if(zoomDepth<-5000)
+			camera.setFarClip(-zoomDepth*2);
+		else
+			camera.setFarClip(10000);
 		zoomAffine.setTz(getZoomDepth());
 	}
 

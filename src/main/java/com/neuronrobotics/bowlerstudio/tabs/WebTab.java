@@ -1,8 +1,10 @@
 package com.neuronrobotics.bowlerstudio.tabs;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.BowlerStudioController;
 import com.neuronrobotics.bowlerstudio.Tutorial;
 import com.neuronrobotics.bowlerstudio.assets.AssetFactory;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 import com.neuronrobotics.bowlerstudio.scripting.PasswordManager;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingWebWidget;
@@ -24,7 +26,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebHistory;
 import javafx.scene.web.WebView;
-import org.reactfx.util.FxTimer;
 
 import java.awt.*;
 import java.io.IOException;
@@ -93,7 +94,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 		
 		loaded=false;
 		setOnCloseRequest(this);
-		webEngine.getLoadWorker().workDoneProperty().addListener((ChangeListener<Number>) (observableValue, oldValue, newValue) -> Platform.runLater(() -> {
+		webEngine.getLoadWorker().workDoneProperty().addListener((ChangeListener<Number>) (observableValue, oldValue, newValue) -> BowlerStudio.runLater(() -> {
 		    if(!(newValue.intValue()<100)){
 		    	//System.err.println("Just finished! "+webEngine.getLocation());
 		    	
@@ -133,7 +134,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 			public void changed(ObservableValue<? extends String> observable1,String oldValue, String newValue) {
 				
 						//System.out.println("Location Changed: "+newValue);
-						Platform.runLater(() -> {
+						BowlerStudio.runLater(() -> {
 							urlField.setText(newValue);
 						});
 			}
@@ -184,7 +185,14 @@ public class WebTab extends Tab implements EventHandler<Event>{
 		vBox = new VBox(5);
 		vBox.getChildren().setAll(hBox, webView);
 		VBox.setVgrow(webView, Priority.ALWAYS);
-
+		FontSizeManager.addListener(fontNum -> {
+			double scale = ((double) fontNum - 10) / 12.0;
+			if (scale < 1)
+				scale = 1;
+			System.out.println("Web scale "+scale);
+			double s=scale;
+			BowlerStudio.runLater(() ->webView.setZoom(s));
+		});
 		myTab.setContent(vBox);
 		//Action definition for the Button Go.
 		EventHandler<ActionEvent> goAction = event -> {
@@ -197,7 +205,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 		urlField.setOnAction(goAction);
 		goButton.setOnAction(goAction);
 		//Once all components are loaded, load URL
-		FxTimer.runLater(
+		BowlerStudio.runLater(
 				Duration.ofMillis(200) ,new Runnable() {
 					@Override
 					public void run() { goAction.handle(null);}
@@ -211,7 +219,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 	public void loadUrl(String url){
 		
 		if(processNewTab(Current_URL)){
-			Platform.runLater(() -> {
+			BowlerStudio.runLater(() -> {
 				webEngine.load(url);
 			});
 		}
@@ -275,10 +283,10 @@ public class WebTab extends Tab implements EventHandler<Event>{
 				finishedLoadingScriptingWidget=false;
 				try{
 					setScripting(new ScriptingWebWidget( null ,Current_URL, webEngine));
-					Platform.runLater(() -> {
+					BowlerStudio.runLater(() -> {
 						vBox.getChildren().add(getScripting());
 						if(!isTutorialTab){
-							Platform.runLater(()->{
+							BowlerStudio.runLater(()->{
 								try{
 									
 									myTab.setText(getScripting().getFileName());
@@ -325,7 +333,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 //      Out("currentIndex = "+currentIndex);
 //      Out(entryList.toString().replace("],","]\n"));
 
-      Platform.runLater(() ->{
+      BowlerStudio.runLater(() ->{
     	  try{
     		  history.go(-1);
     	  }catch(Exception e){
@@ -343,7 +351,7 @@ public class WebTab extends Tab implements EventHandler<Event>{
 //      Out("currentIndex = "+currentIndex);
 //      Out(entryList.toString().replace("],","]\n"));
     
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			try {
 				history.go(1);
 			} catch (IndexOutOfBoundsException ex) {

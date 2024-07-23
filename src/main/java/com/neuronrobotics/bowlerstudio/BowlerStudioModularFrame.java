@@ -5,6 +5,7 @@ package com.neuronrobotics.bowlerstudio;
  **/
 
 import com.neuronrobotics.bowlerstudio.assets.AssetFactory;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 import com.neuronrobotics.bowlerstudio.scripting.PasswordManager;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingFileWidget;
@@ -16,6 +17,7 @@ import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
 import javafx.scene.control.Tab;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
@@ -25,6 +27,7 @@ import javafx.stage.Stage;
 import org.dockfx.DockNode;
 import org.dockfx.DockPane;
 import org.dockfx.DockPos;
+import org.dockfx.IStageModifyer;
 
 import java.io.File;
 import java.io.IOException;
@@ -104,9 +107,9 @@ public class BowlerStudioModularFrame {
 		 webtab = null;
 		try {
 
-			Platform.runLater(()->{
+			BowlerStudio.runLater(()->{
 				try {
-					webtab = new WebTab("Tutorial", homeURL, true);
+					webtab = new WebTab("Documentation", homeURL, true);
 					setTutorialDockNode(new DockNode(webtab.getContent(), webtab.getText(), webtab.getGraphic()));
 					getTutorialDockNode().setPrefSize(1024, 730);
 				} catch (IOException | InterruptedException e) {
@@ -150,9 +153,11 @@ public class BowlerStudioModularFrame {
 		commandLine.setClassLoader(Terminal.class.getClassLoader());
 		FXMLLoader menueBar;
 		menueBar = AssetFactory.loadLayout("layout/BowlerStudioMenuBar.fxml");
-		menueController = new BowlerStudioMenu(this);
+		menueController = new BowlerStudioMenu(this,creatureLab3dController);
 		menueBar.setController(menueController);
 		menueBar.setClassLoader(BowlerStudioMenu.class.getClassLoader());
+		
+		
 
 		try {
 			menueBar.load();
@@ -174,7 +179,7 @@ public class BowlerStudioModularFrame {
 				ThreadUtil.wait(100);
 			}
 		} while (creatureLab3dDockNode==null);
-		creatureLab3dDockNode.setPrefSize(400, 400);
+		creatureLab3dDockNode.setPrefSize(500, 500);
 		
 
 
@@ -192,7 +197,7 @@ public class BowlerStudioModularFrame {
 		isOpen.put("showDevices", false);
 
 		// focus on the tutorial to start
-		Platform.runLater(() -> getTutorialDockNode().requestFocus());
+		BowlerStudio.runLater(() -> getTutorialDockNode().requestFocus());
 		connectionManagerDockNode.onMouseClickedProperty().addListener((a, b, c) -> {
 			System.err.println("Cloick");
 		});
@@ -204,7 +209,7 @@ public class BowlerStudioModularFrame {
 	}
 
 	private void addTutorial() {
-		Platform.runLater(() -> getTutorialDockNode().dock(dockPane, DockPos.LEFT));
+		BowlerStudio.runLater(() -> getTutorialDockNode().dock(dockPane, DockPos.LEFT));
 
 	}
 
@@ -216,7 +221,7 @@ public class BowlerStudioModularFrame {
 		if (isOpen.get("showTerminal") == null) {
 			isOpen.put("showTerminal", false);
 		}
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			if (!isOpen.get(key)) {
 				isOpen.put(key, true);
 				if (isOpen.get("showTerminal"))
@@ -234,7 +239,7 @@ public class BowlerStudioModularFrame {
 				});
 
 			}
-			Platform.runLater(() -> connectionManagerDockNode.requestFocus());
+			BowlerStudio.runLater(() -> connectionManagerDockNode.requestFocus());
 		});
 
 	}
@@ -251,7 +256,7 @@ public class BowlerStudioModularFrame {
 		}
 		if (!isOpen.get(key)) {
 			isOpen.put(key, true);
-			Platform.runLater(() -> {
+			BowlerStudio.runLater(() -> {
 
 				if (isOpen.get("showDevices"))
 					terminalDockNode.dock(dockPane, DockPos.LEFT, connectionManagerDockNode);
@@ -271,7 +276,7 @@ public class BowlerStudioModularFrame {
 					}
 				});
 
-				Platform.runLater(() -> terminalDockNode.requestFocus());
+				BowlerStudio.runLater(() -> terminalDockNode.requestFocus());
 
 			});
 
@@ -284,12 +289,14 @@ public class BowlerStudioModularFrame {
 
 	public void showCreatureLab(int depth) {
 		String key = "showCreatureLab";
-		if (!isOpen.get(key)) {
+		Boolean boolean1 = isOpen.get(key);
+		if(boolean1!=null)
+		if (!boolean1) {
 			isOpen.put(key, true);
 			new Thread(() -> {
-				ThreadUtil.wait(100);
+				//ThreadUtil.wait(100);
 
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					try {
 						creatureLab3dDockNode.dock(dockPane, DockPos.RIGHT);
 						isOpen.put(key, true);
@@ -310,7 +317,7 @@ public class BowlerStudioModularFrame {
 
 				});
 
-				Platform.runLater(() -> creatureLab3dDockNode.closedProperty().addListener(new InvalidationListener() {
+				BowlerStudio.runLater(() -> creatureLab3dDockNode.closedProperty().addListener(new InvalidationListener() {
 					@Override
 					public void invalidated(Observable event) {
 						creatureLab3dDockNode.closedProperty().removeListener(this);
@@ -321,7 +328,7 @@ public class BowlerStudioModularFrame {
 			}).start();
 		}
 		// else
-		// Platform.runLater(() -> creatureLab3dDockNode.requestFocus());
+		// BowlerStudio.runLater(() -> creatureLab3dDockNode.requestFocus());
 
 	}
 
@@ -341,6 +348,18 @@ public class BowlerStudioModularFrame {
 
 	public static void setPrimaryStage(Stage primaryStage) {
 		BowlerStudioModularFrame.primaryStage = primaryStage;
+		DockNode.addStageToDockingSystem(primaryStage);
+		DockNode.setModifyer(new IStageModifyer() {
+			@Override
+			public void onNewStage(Stage s) {
+				Parent r = s.getScene().getRoot();
+				FontSizeManager.addListener(fontNum->{
+					BowlerStudioController.getBowlerStudio().setFontSize(fontNum);
+					double tmp = FontSizeManager.getImageScale()*9;
+					r.setStyle("-fx-font-size: "+((int)tmp)+"pt");
+				});
+			}
+		});
 	}
 
 	public ScriptingFileWidget createFileTab(File file) {
@@ -349,7 +368,7 @@ public class BowlerStudioModularFrame {
 	}
 
 	public void openUrlInNewTab(URL url) {
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			try {
 				if (PasswordManager.getUsername()  != null) {
 					WebTab newTab = new WebTab("Web", url.toExternalForm(), false);
@@ -369,11 +388,11 @@ public class BowlerStudioModularFrame {
 			DockNode dn=webTabs.get(newTab);
 			webTabs.remove(newTab);
 			if(dn!=null)
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					try {
 						dn.undock();
 					}catch(java.lang.NullPointerException ex) {}
-					Platform.runLater(() -> dn.close());
+					BowlerStudio.runLater(() -> dn.close());
 					if(newTab!=null)
 						if (newTab.getOnCloseRequest() != null) {
 							newTab.getOnCloseRequest().handle(null);
@@ -385,18 +404,24 @@ public class BowlerStudioModularFrame {
 	public void addTab(Tab newTab, boolean b) {
 		System.err.println("Loading a new tab: " + newTab.getText());
 		if (webTabs.get(newTab) != null) {
-			Platform.runLater(() -> webTabs.get(newTab).requestFocus());
+			BowlerStudio.runLater(() -> webTabs.get(newTab).requestFocus());
 		} else {
-			Platform.runLater(() -> {
+			//BowlerStudio.runLater(() -> {
+				if(newTab.getGraphic()==null) {
+					newTab.setGraphic(AssetFactory.loadIcon("Hardware-Config.png"));
+				}
+				if(newTab.getContent()==null) {
+					throw new RuntimeException("Tabs must have content before loading");
+				}
 				DockNode dn = new DockNode(newTab.getContent(), newTab.getText(), newTab.getGraphic());
 				dn.closedProperty().addListener(event -> {
-					closeTab(newTab);
+					BowlerStudio.runLater(() ->closeTab(newTab));
 				});
 	
 				webTabs.put(newTab, dn);
 				dn.dock(dockPane, DockPos.CENTER, getTutorialDockNode());
 				
-			});
+			//});
 		}
 	}
 
@@ -408,7 +433,7 @@ public class BowlerStudioModularFrame {
 	public void setSelectedTab(Tab tab) {
 		DockNode dockNode = webTabs.get(tab);
 		if (dockNode != null)
-			Platform.runLater(() -> {
+			BowlerStudio.runLater(() -> {
 				dockNode.requestFocus();
 			});
 	}

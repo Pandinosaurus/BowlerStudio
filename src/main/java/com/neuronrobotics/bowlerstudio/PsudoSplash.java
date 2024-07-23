@@ -3,30 +3,36 @@ package com.neuronrobotics.bowlerstudio;
 import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GraphicsDevice;
-import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.URL;
 
-import javafx.scene.image.Image;
 import javax.imageio.ImageIO;
-import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
 import com.neuronrobotics.bowlerstudio.assets.StudioBuildInfo;
+import com.neuronrobotics.bowlerstudio.scripting.GitLogProgressMonitor;
+import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 
-public class PsudoSplash {
+public class PsudoSplash implements GitLogProgressMonitor{
 	JFrame interfaceFrame;
 	private String message = "";
+	private String log = "";
+	private static URL resource = PsudoSplash.class.getResource("splash.png");
 
+	@Override
+	public void onUpdate(String update, Exception e) {
+		//e.printStackTrace(System.err);
+		log=update;
+		updateSplash();
+	}
 	class CustomPanel extends JPanel {
 		/**
 		 * 
@@ -47,7 +53,7 @@ public class PsudoSplash {
 				 * | | package image(folder) ( or | .class 404error.jpg files, if no package
 				 * exists.)
 				 */
-				image = ImageIO.read(getClass().getResource("splash.png"));
+				image = ImageIO.read(getResource());
 
 			} catch (IOException ioe) {
 				System.out.println("Unable to fetch image.");
@@ -88,11 +94,18 @@ public class PsudoSplash {
 			splashGraphics.setPaintMode();
 			splashGraphics.setColor(Color.WHITE);
 			splashGraphics.drawString(getMessage(), 65, 280);
+			
+			splashGraphics.setComposite(AlphaComposite.Clear);
+			// splashGraphics.fillRect(65, 270, 200, 40);
+			splashGraphics.setPaintMode();
+			splashGraphics.setColor(Color.WHITE);
+			splashGraphics.drawString(log, 15, 120);
 
 		}
 	}
 
 	public PsudoSplash() {
+		
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
@@ -115,7 +128,7 @@ public class PsudoSplash {
 				interfaceFrame.setVisible(true);
 				interfaceFrame.setBackground(new Color(0, 0, 0, 0));
 				try {
-					interfaceFrame.setIconImage( ImageIO.read(getClass().getResource("splash.png")));
+					interfaceFrame.setIconImage(ImageIO.read(resource));
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -136,6 +149,7 @@ public class PsudoSplash {
 			e.printStackTrace();
 		}
 	}
+
 //	public void setIcon(Image img) {
 //		BufferedImage image = javafx.embed.swing.SwingFXUtils.fromFXImage(img, null);
 //		if (interfaceFrame != null)
@@ -150,6 +164,8 @@ public class PsudoSplash {
 	void closeSplashLocal() {
 		if (interfaceFrame != null)
 			interfaceFrame.setVisible(false);
+		//ScriptingEngine.removeLogListener(this);
+		
 	}
 
 	void updateSplash() {
@@ -166,11 +182,23 @@ public class PsudoSplash {
 	public void setMessage(String message) {
 		if (message.length() > 23) {
 			this.message = message.subSequence(0, 23).toString();
-			//new RuntimeException().printStackTrace();
+			// new RuntimeException().printStackTrace();
 		} else
 			this.message = message;
 		if (interfaceFrame != null) {
 			interfaceFrame.setVisible(true);
 		}
+		ScriptingEngine.addLogListener(this);
+		log="";
 	}
+
+	public static URL getResource() {
+		return resource;
+	}
+
+	public static void setResource(URL r) {
+		resource = r;
+	}
+
+
 }

@@ -4,6 +4,7 @@ import com.neuronrobotics.bowlerstudio.BowlerStudio;
 import com.neuronrobotics.bowlerstudio.BowlerStudioController;
 import com.neuronrobotics.bowlerstudio.ConnectionManager;
 import com.neuronrobotics.bowlerstudio.assets.AssetFactory;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
 //import com.neuronrobotics.imageprovider.OpenCVImageProvider;
 import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.util.ThreadUtil;
@@ -107,7 +108,6 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 			new Thread() {
 				public void run() {
 					doFork();
-
 				}
 
 
@@ -135,7 +135,6 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 		if (isOwnedByLoggedInUser)
 			BowlerStudio.createFileTab(currentFile);
 		else {
-			// todo fork git repo
 			System.out.println("Making Fork...");
 			String reponame = currentFile.getName().split("\\.")[0]+"_"+PasswordManager.getLoginID();
 			try {
@@ -143,7 +142,6 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 				File file = ScriptingEngine.fileFromGit(newGit, currentFile.getName());
 				BowlerStudio.createFileTab(file);
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -151,11 +149,8 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 	
 	private void reset() {
 		running = false;
-		Platform.runLater(() -> {
-			runfx.setText("Run");
-			runfx.setGraphic(AssetFactory.loadIcon("Run.png"));
-			runfx.setBackground(new Background(new BackgroundFill(Color.LIGHTGREEN, CornerRadii.EMPTY, Insets.EMPTY)));
-
+		BowlerStudio.runLater(() -> {
+			BowlerStudio.setToRunButton(runfx);
 		});
 
 	}
@@ -209,7 +204,7 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 				currentFile = ScriptingEngine.fileFromGit(id, file);
 			}
 			isOwnedByLoggedInUser = ScriptingEngine.checkOwner(currentFile);
-			Platform.runLater(() -> {
+			BowlerStudio.runLater(() -> {
 				if (isOwnedByLoggedInUser) {
 					edit.setText("Edit...");
 					edit.setGraphic(AssetFactory.loadIcon("Edit-Script.png"));
@@ -221,6 +216,10 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 			try {
 				image.setImage(AssetFactory
 						.loadAsset("Script-Tab-" + ScriptingEngine.getShellType(currentFile.getName()) + ".png"));
+				FontSizeManager.addListener(fontNum->{
+			    	  image.setScaleX(FontSizeManager.getImageScale());
+			    	  image.setScaleY(FontSizeManager.getImageScale());
+			      });
 			} catch (Exception e2) {
 				// TODO Auto-generated catch block
 				e2.printStackTrace();
@@ -240,9 +239,9 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 		engine = e;
 		loadGist = true;
 		fileListBox.valueProperty().removeListener(this);
-		Platform.runLater(() -> runfx.setDisable(true));
-		Platform.runLater(() -> edit.setDisable(true));
-		Platform.runLater(() -> fileListBox.getItems().clear());
+		BowlerStudio.runLater(() -> runfx.setDisable(true));
+		BowlerStudio.runLater(() -> edit.setDisable(true));
+		BowlerStudio.runLater(() -> fileListBox.getItems().clear());
 		List<String> gists = ScriptingEngine.getCurrentGist(addr, engine);
 		ArrayList<String> fileList;
 		if (!gists.isEmpty()) {
@@ -270,7 +269,7 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 		if (!fileList.isEmpty())
 			loadGitLocal(currentGit, fileList.get(0));
 
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			ArrayList<String> fileListToDisplay = new ArrayList<>();
 			for (String s : fileList) {
 				if(!s.startsWith(".")) {
@@ -296,8 +295,8 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 					e1.printStackTrace();
 				}
 				fileListBox.valueProperty().addListener(this);
-				Platform.runLater(() -> runfx.setDisable(false));
-				Platform.runLater(() -> edit.setDisable(false));
+				BowlerStudio.runLater(() -> runfx.setDisable(false));
+				BowlerStudio.runLater(() -> edit.setDisable(false));
 			}
 		});
 		// }).start();
@@ -306,18 +305,10 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 
 	private void start() {
 		BowlerStudio.clearConsole();
-		try {
-			ScriptingEngine.setAutoupdate(true);
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		running = true;
-		Platform.runLater(() -> {
-			runfx.setText("Stop");
-			runfx.setGraphic(AssetFactory.loadIcon("Stop.png"));
-			runfx.setBackground(new Background(new BackgroundFill(Color.RED, CornerRadii.EMPTY, Insets.EMPTY)));
 
+		running = true;
+		BowlerStudio.runLater(() -> {
+			BowlerStudio.setToStopButton(runfx);
 		});
 		scriptRunner = new Thread() {
 
@@ -339,7 +330,7 @@ public class ScriptingWebWidget extends BorderPane implements ChangeListener<Obj
 
 				} catch (Throwable ex) {
 					System.err.println("Script exception of type= " + ex.getClass().getName());
-					Platform.runLater(() -> {
+					BowlerStudio.runLater(() -> {
 						try {
 							if (ex.getMessage().contains("sleep interrupted")) {
 								append("\n" + currentFile + " Interupted\n");

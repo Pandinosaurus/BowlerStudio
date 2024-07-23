@@ -1,5 +1,8 @@
 package com.neuronrobotics.bowlerstudio.creature;
 
+import com.neuronrobotics.bowlerstudio.BowlerStudio;
+import com.neuronrobotics.bowlerstudio.assets.FontSizeManager;
+
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -9,9 +12,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
+import javafx.scene.control.Label;
 
+@SuppressWarnings("restriction")
 public class EngineeringUnitsSliderWidget extends GridPane implements ChangeListener<Number> {
-	private TextField setpointValue;
+	private TextField spv;
+	private Label increment;
 	private Slider setpoint;
 	private IOnEngineeringUnitsChange listener;
 	private boolean intCast = false;
@@ -20,6 +26,10 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 	private Button jogminus = new Button("-");
 	private double instantValueStore = 0;
 	private boolean editing = false;
+	private double jogIncrement = 1.0;
+	private String units;
+	private double min;
+	private double max;
 
 	public EngineeringUnitsSliderWidget(IOnEngineeringUnitsChange listener, double min, double max, double current,
 			double width, String units, boolean intCast) {
@@ -29,24 +39,31 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 
 	public EngineeringUnitsSliderWidget(IOnEngineeringUnitsChange listener, double current, double width,
 			String units) {
-		this(listener, current / 2, current * 2, current, width, units);
-
+		this(listener, -Float.MAX_VALUE, Float.MAX_VALUE, current, width, units);
+		
 	}
 
-	private void onSliderMoving(EngineeringUnitsSliderWidget source, double newAngleDegrees) {
+	private void onSliderMovingInternal(EngineeringUnitsSliderWidget source, double newAngleDegrees) {
 		editing = true;
+		//System.out.println("Slider moving ");
 		getListener().onSliderMoving(this, newAngleDegrees);
 	}
 
-	private void onSliderDoneMoving(EngineeringUnitsSliderWidget source, double newAngleDegrees) {
+	private void onSliderDoneMovingInternal(EngineeringUnitsSliderWidget source, double newAngleDegrees) {
 		editing = false;
+		instantValueStore=(newAngleDegrees);
+		//System.out.println("Slider done");
 		getListener().onSliderDoneMoving(this, newAngleDegrees);
 	}
 
-	public EngineeringUnitsSliderWidget(IOnEngineeringUnitsChange listener, double min, double max, double current,
+	public EngineeringUnitsSliderWidget(IOnEngineeringUnitsChange listener, double minIn, double maxIn, double current,
 			double width, String units) {
+		this.min = minIn;
+		this.max = maxIn;
+		this.units = units;
 		this.setListener(listener);
 		setpoint = new Slider();
+		increment = new Label(jogIncrement+"");
 		instantValueStore = current;
 		if (min > max) {
 			double minStart = min;
@@ -72,28 +89,25 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 		setpoint.setMajorTickUnit(range);
 		setpoint.setMinorTickCount(5);
 		// setpoint.setBlockIncrement(range/100);
-		setpointValue = new TextField(getFormatted(current));
-		setpointValue.focusedProperty().addListener(new ChangeListener<Boolean>() {
+		spv = new TextField(getFormatted(current));
+		spv.focusedProperty().addListener(new ChangeListener<Boolean>() {
 			@Override
 			public void changed(ObservableValue<? extends Boolean> arg0, Boolean oldPropertyValue,
 					Boolean newPropertyValue) {
 				if (newPropertyValue) {
-					// System.out.println("Textfield on focus");
+					//System.out.println("Textfield on focus");
 					editing = true;
 				} else {
-					// System.out.println("Textfield out focus");
+					//System.out.println("Textfield out focus");
 					editing = false;
 				}
 			}
 		});
-		setpointValue.setOnAction(event -> {
-			String txt = setpointValue.getText();
-			try {
-				double val = Double.parseDouble(txt);
-				// System.out.println("Setpoint Text changed to "+val);
-
-				localSetValue(val);
+		spv.setOnAction(event -> {
+			try {				
+				localSetValue(Double.parseDouble(spv.getText()));
 			} catch (Throwable t) {
+				t.printStackTrace();
 				localSetValue(instantValueStore);
 
 			}
@@ -101,11 +115,11 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 		setpoint.setMaxWidth(width);
 		setpoint.valueChangingProperty().addListener((ChangeListener<Boolean>) (observable, oldValue, newValue) -> {
 			try {
-				double val = Double.parseDouble(setpointValue.getText());
-				// System.err.println("Slider done moving = "+newValue);
+				//System.err.println("Slider moving = "+newValue);
 				if (!newValue)
-					onSliderDoneMoving(this, val);
+					onSliderDoneMovingInternal(this, setpoint.getValue());
 			} catch (java.lang.NumberFormatException ex) {
+				ex.printStackTrace();
 				setValue(0);
 				return;
 			}
@@ -114,17 +128,19 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 		setpoint.valueProperty().addListener(this);
 
 		String unitsString = "(" + units + ")";
+		double scale = (double)(FontSizeManager.getDefaultSize())/12.0;
+		getColumnConstraints().add(new ColumnConstraints(30*scale)); // column 2 is 100 wide
+		getColumnConstraints().add(new ColumnConstraints(40*scale)); // column 2 is 100 wide
+		getColumnConstraints().add(new ColumnConstraints(30*scale)); // column 2 is 100 wide
+		getColumnConstraints().add(new ColumnConstraints(100*scale)); // column 2 is 100 wide
+		getColumnConstraints().add(new ColumnConstraints(unitsString.length() * 7*scale)); // column 2 is 100 wide
 
-		getColumnConstraints().add(new ColumnConstraints(30)); // column 2 is 100 wide
-		getColumnConstraints().add(new ColumnConstraints(30)); // column 2 is 100 wide
-		getColumnConstraints().add(new ColumnConstraints(100)); // column 2 is 100 wide
-		getColumnConstraints().add(new ColumnConstraints(unitsString.length() * 7)); // column 2 is 100 wide
-
-		add(setpoint, 2, 1);
-		add(jogplus, 1, 0);
+		add(setpoint, 3, 1);
+		add(jogplus, 2, 0);
+		add(increment, 1, 0);
 		add(jogminus, 0, 0);
-		add(setpointValue, 2, 0);
-		add(new Text(unitsString), 3, 0);
+		add(spv, 3, 0);
+		add(new Text(unitsString), 4, 0);
 
 		jogplus.setOnAction(event -> {
 			jogPlusOne();
@@ -135,31 +151,33 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 	}
 
 	private void localSetValue(double val) {
-		Platform.runLater(() -> {
+		BowlerStudio.runLater(() -> {
 			editing = false;
 			setValue(val);
 
-			onSliderMoving(this, val);
-			onSliderDoneMoving(this, val);
+			onSliderMovingInternal(this, val);
+			onSliderDoneMovingInternal(this, val);
 		});
 	}
 
 	public void jogMinusOne() {
-		double value = getValue() - 1;
-		if (value < setpoint.getMin())
-			return;
-		setValue(value);
-		onSliderMoving(this, value);
-		onSliderDoneMoving(this, value);
+		jog(-getJogIncrement());
 	}
 
 	public void jogPlusOne() {
-		double value = getValue() + 1;
-		if (value > setpoint.getMax())
+		jog(getJogIncrement());
+	}
+	public void jog(double amount) {
+		double value = getValue() + amount;
+		double max2 = setpoint.getMax();
+		if (value > max2)
+			return;
+		double min2 = setpoint.getMin();
+		if (value < min2)
 			return;
 		setValue(value);
-		onSliderMoving(this, value);
-		onSliderDoneMoving(this, value);
+		onSliderMovingInternal(this, value);
+		onSliderDoneMovingInternal(this, value);
 	}
 
 	public void setUpperBound(double newBound) {
@@ -173,12 +191,13 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 	@Override
 	public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
 		updateValue();
+		//System.out.println("Updating value to "+newValue);
 	}
 
 	private void updateValue() {
-		Platform.runLater(() -> {
-			setpointValue.setText(getFormatted(setpoint.getValue()));
-			onSliderMoving(this, setpoint.getValue());
+		BowlerStudio.runLater(() -> {
+			spv.setText(getFormatted(setpoint.getValue()));
+			onSliderMovingInternal(this, setpoint.getValue());
 		});
 	}
 
@@ -200,7 +219,8 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 		}
 		instantValueStore = val;
 		double toSet = val;
-		Platform.runLater(() -> {
+		
+		BowlerStudio.runLater(() -> {
 			setValueLocal(toSet);
 		});
 
@@ -212,7 +232,7 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 		if (range > 0)
 			setpoint.setMajorTickUnit(range);
 		setpoint.setValue(value);
-		setpointValue.setText(getFormatted(setpoint.getValue()));
+		spv.setText(getFormatted(setpoint.getValue()));
 		setpoint.valueProperty().addListener(this);
 		// System.out.println("Setpoint changed to "+val);
 	}
@@ -224,7 +244,7 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 	public String getFormatted(double value) {
 		if (intCast)
 			return String.valueOf((int) value);
-		return String.format("%8.2f", (double) value);
+		return String.format("%8.3f", (double) value);
 	}
 
 	public IOnEngineeringUnitsChange getListener() {
@@ -265,5 +285,23 @@ public class EngineeringUnitsSliderWidget extends GridPane implements ChangeList
 
 	public boolean isEditing() {
 		return editing;
+	}
+
+	/**
+	 * @return the jogIncrement
+	 */
+	public double getJogIncrement() {
+		return jogIncrement;
+	}
+
+	/**
+	 * @param jogIncrement the jogIncrement to set
+	 */
+	public void setJogIncrement(double j) {
+		//System.out.println("Increment set to "+j+" "+units);
+		jogIncrement=Math.abs(j);
+		BowlerStudio.runLater(()->{
+			increment.setText(""+jogIncrement);
+		});
 	}
 }

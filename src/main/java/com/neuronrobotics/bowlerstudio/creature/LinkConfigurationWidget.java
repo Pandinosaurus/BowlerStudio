@@ -1,19 +1,10 @@
 package com.neuronrobotics.bowlerstudio.creature;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
-import org.reactfx.util.FxTimer;
 
 import com.neuronrobotics.bowlerstudio.BowlerStudio;
-import com.neuronrobotics.bowlerstudio.scripting.PasswordManager;
-import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 import com.neuronrobotics.bowlerstudio.vitamins.Vitamins;
-import com.neuronrobotics.sdk.addons.kinematics.AbstractKinematicsNR;
 import com.neuronrobotics.sdk.addons.kinematics.AbstractLink;
 import com.neuronrobotics.sdk.addons.kinematics.LinkConfiguration;
 import com.neuronrobotics.sdk.addons.kinematics.LinkFactory;
@@ -23,19 +14,13 @@ import com.neuronrobotics.sdk.addons.kinematics.math.TransformNR;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
-import javafx.geometry.Insets;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
 import java.time.Duration;
+import javafx.scene.control.CheckBox;
 
 @SuppressWarnings("restriction")
 public class LinkConfigurationWidget extends GridPane implements ITrimControl {
@@ -147,7 +132,7 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 		shaftSize.getSelectionModel().select(conf.getShaftSize());
 
 		for (String vitaminsType : Vitamins.listVitaminTypes()) {
-			HashMap<String, Object> meta = Vitamins.getMeta(vitaminsType);
+			Map<String, Object> meta = Vitamins.getMeta(vitaminsType);
 			if (meta != null && meta.containsKey("shaft"))
 				shaftType.getItems().add(vitaminsType);
 		}
@@ -173,24 +158,26 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 				conf.setElectroMechanicalSize(motorsize);
 				//newHardware.setText("New " + conf.getElectroMechanicalType());
 				//editHardware.setText("Edit " + conf.getElectroMechanicalSize());
-				HashMap<String, Object> vitaminData = Vitamins.getConfiguration(conf.getElectroMechanicalType(),
-						conf.getElectroMechanicalSize());
-				System.out.println("New size " + vitaminData);
-				String shafttype = (String) vitaminData.get("shaftType");
-				String shaftsize = (String) vitaminData.get("shaftSize");
+//				Map<String, Object> vitaminData = Vitamins.getConfiguration(conf.getElectroMechanicalType(),
+//						conf.getElectroMechanicalSize());
+//				System.out.println("New size " + vitaminData);
+				String shafttype = (String) Vitamins.getMeasurement(conf.getElectroMechanicalType(),
+						conf.getElectroMechanicalSize(),"shaftType");
+				String shaftsize = (String) Vitamins.getMeasurement(conf.getElectroMechanicalType(),
+						conf.getElectroMechanicalSize(),"shaftSize");
 
-				Platform.runLater(() -> {
+				BowlerStudio.runLater(() -> {
 					setShaftType( shaftSize, shafttype);
-					FxTimer.runLater(Duration.ofMillis(20), () -> {
+					BowlerStudio.runLater(Duration.ofMillis(20), () -> {
 						setShaftSize( shaftsize);
-						FxTimer.runLater(Duration.ofMillis(200), new Runnable() {
+						BowlerStudio.runLater(Duration.ofMillis(200), new Runnable() {
 							@Override
 							public void run() {
 
 								System.out.println("Settting shaft size: " + shaftsize + " of " + shafttype);
 
-								Platform.runLater(() -> shaftType.getSelectionModel().select(shafttype));
-								Platform.runLater(() -> shaftSize.getSelectionModel().select(shaftsize));
+								BowlerStudio.runLater(() -> shaftType.getSelectionModel().select(shafttype));
+								BowlerStudio.runLater(() -> shaftSize.getSelectionModel().select(shaftsize));
 							}
 						});
 					});
@@ -205,7 +192,7 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 		emHardwareSize.getSelectionModel().select(conf.getElectroMechanicalSize());
 
 		for (String vitaminsType : Vitamins.listVitaminTypes()) {
-			HashMap<String, Object> meta = Vitamins.getMeta(vitaminsType);
+			Map<String, Object> meta = Vitamins.getMeta(vitaminsType);
 			if (meta != null && meta.containsKey("actuator"))
 				emHardwareType.getItems().add(vitaminsType);
 		}
@@ -239,7 +226,8 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 		add(new Text("Scale To Degrees "), 0, 0);
 		add(scale, 1, 0);
 		add(new Text("(unitless)"), 2, 0);
-
+	
+		
 		double min = activLink.getDeviceMinimumValue();
 		lowerBound = new EngineeringUnitsSliderWidget(new IOnEngineeringUnitsChange() {
 
@@ -335,6 +323,7 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 				conf.setHardwareIndex(Integer.parseInt(channel.getSelectionModel().getSelectedItem()));
 				factory.refreshHardwareLayer(conf);
 				activLink = factory.getLink(conf);
+				activLink.flush(0);
 				System.out.println("Link channel to " + conf.getTypeString());
 				if (manager != null)
 					manager.generateCad();
@@ -348,6 +337,7 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 			comboBox.getItems().add(type);
 		}
 		comboBox.getItems().add("virtual");
+		comboBox.getItems().add("pid-prismatic");
 		comboBox.setOnAction(new EventHandler<ActionEvent>() {
 
 			@Override
@@ -401,6 +391,13 @@ public class LinkConfigurationWidget extends GridPane implements ITrimControl {
 		add(new Text("Shaft Size"), 0, 15);
 		add(shaftSize, 1, 15);
 //		add(newShaft, 1, 16);
+		CheckBox isPassive =new CheckBox();
+		isPassive.setSelected(conf.isPassive());
+		isPassive.setOnAction(action->{
+			conf.setPassive(isPassive.isSelected());
+		});
+		add(new Text("Link Is Passive"), 0, 16);
+		add(isPassive, 1, 16);
 
 	}
 	
